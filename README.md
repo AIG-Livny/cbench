@@ -3,32 +3,26 @@ This benchmark will show time of processing functions with arguments passed by v
 
 ### Run
 ```sh
-./run.sh
+./build.py run
 ```
+require
+```
+pip install matplotlib
+```
+
 ## Results
 Example:
 
-```
-Build -O0
-BENCH s1 by_value n=100000 t=0.13
-BENCH s1 by_pointer n=100000 t=0.13
+![image](1.png)
 
-...
+Y-axis unit = `time_t` cycles
+X-axis unit = sizeof(struct)  which is argument passed by value or by pointer
 
-0Build -O1
-...
-0Build -O2
-...
-0Build -O3
+The relative plot is showing "time by value - time by pointer" or "how much pointer faster than value copy"
 
-```
+Each time value is average time for 100000 times of measurements.
 
-Description:
+"one byte process" - is functions where only one byte changes
 
-`Build -O0` - what build option testing now
-
-`BENCH s1 by_value n=100000 t=0.13`:
-
-- `s1` - structure of 1 byte
-- `n=100000` - number of tests,
-- `t=0.13` average time by one test
+"all bytes process" - is functions where all bytes changes
+it shows difference time processing of dereference of each address
