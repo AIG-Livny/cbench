@@ -3,7 +3,7 @@
 def get_config() -> "ToolConfig":
     tc = ToolConfig()
     tc.MINIMUM_REQUIRED_VERSION = '0.7.0'
-    #tc.VERBOSITY = "CRITICAL"
+    tc.VERBOSITY = "CRITICAL"
     return tc
 
 def get_rules() -> list['Rule']:
@@ -34,28 +34,6 @@ def get_rules() -> list['Rule']:
 
     c.add_rules_from_d_file('obj/main.d',rules)
     return rules
-
-    default = mapyr.ProjectConfig()
-    default.OUT_FILE  = "bin/bench"
-    default.COMPILER  = "clang"
-    default.GROUPS = ['DEBUG']
-    default.SRC_DIRS = ['.']
-    default.INCLUDE_DIRS = ['.','c-vector']
-
-    default.VSCODE_CPPTOOLS_CONFIG = True
-
-    case1 = copy.deepcopy(default)
-    case1.CFLAGS = ["-O3","-flto"]
-    case1.LINK_EXE_FLAGS = ["-flto"]
-    case1.OUT_FILE += ''.join(case1.CFLAGS)
-    result.append(case1)
-
-    case2 = copy.deepcopy(default)
-    case2.CFLAGS = ["-O1"]
-    case2.OUT_FILE += ''.join(case2.CFLAGS)
-    result.append(case2)
-
-    return result
 
 #-----------FOOTER-----------
 try:
