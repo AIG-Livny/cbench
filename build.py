@@ -1,21 +1,39 @@
 #!/usr/bin/python3
 
-import copy
-import re
-import matplotlib
-import matplotlib.pyplot as plt
-from itertools import cycle
-import warnings
-
-def tool_config() -> "mapyr.ToolConfig":
-    tc = mapyr.ToolConfig()
-    tc.MINIMUM_REQUIRED_VERSION = '0.4.6'
-    tc.VERBOSITY = "CRITICAL"
+def get_config() -> "ToolConfig":
+    tc = ToolConfig()
+    tc.MINIMUM_REQUIRED_VERSION = '0.7.0'
+    #tc.VERBOSITY = "CRITICAL"
     return tc
 
-def config() -> list["mapyr.ProjectConfig"]:
+def get_rules() -> list['Rule']:
 
-    result = []
+    config1 = c.Config()
+    config1.INCLUDE_DIRS = ['c-vector']
+    config1.CFLAGS = ["-O3","-flto"]
+    config1.LINK_FLAGS = ["-flto"]
+
+    config2 = c.Config()
+    config2.INCLUDE_DIRS = ['c-vector']
+    config2.CFLAGS = ["-O1"]
+
+    rules = []
+    rules.append(Rule('build',['script'], phony=True))
+    rules.append(Rule('script',['script.py','bench-O3-flto','bench-O1'],exec=python.run, phony=True))
+    rules.append(Rule('script.py'))
+
+    rules.append(Rule('bench-O3-flto',['bin/bench-O3-flto'], downstream_config=config1.__dict__,phony=True))
+    rules.append(Rule('bin/bench-O3-flto',['obj/main1.o'],exec=c.link_executable))
+    rules.append(Rule('obj/main1.o',['main.c'],exec=c.build_object))
+
+    rules.append(Rule('bench-O1',['bin/bench-O1'], downstream_config=config2.__dict__,phony=True))
+    rules.append(Rule('bin/bench-O1',['obj/main2.o'],exec=c.link_executable))
+    rules.append(Rule('obj/main2.o',['main.c'],exec=c.build_object))
+
+    rules.append(Rule('main.c'))
+
+    c.add_rules_from_d_file('obj/main.d',rules)
+    return rules
 
     default = mapyr.ProjectConfig()
     default.OUT_FILE  = "bin/bench"
@@ -39,75 +57,15 @@ def config() -> list["mapyr.ProjectConfig"]:
 
     return result
 
-def run():
-    print('Running... please wait')
-
-    results : dict = {}
-    for p in config():
-        if mapyr.Project(p).build() == False:
-            exit()
-        data = mapyr.sh_capture([p.OUT_FILE])
-        regex_data = re.findall(r'^BENCH (s\d+) (\w+) (.*(?= n)) n=(\d+) t=(.*)', data, re.MULTILINE)
-
-        for struct, by_what, desc, num, time in regex_data:
-            num_bytes = int(struct[1:])
-            results.setdefault(p.OUT_FILE, {}).setdefault(num_bytes, {}).setdefault(desc, {})
-            results[p.OUT_FILE][num_bytes][desc][by_what] = float(time)
-            case : dict = results[p.OUT_FILE][num_bytes][desc]
-            if case.get('by_value') and case.get('by_pointer'):
-                case['diff'] = case['by_value'] - case['by_pointer']
-
-    cycol = cycle(matplotlib.colors.TABLEAU_COLORS)
-    fig, (byval, byptr, relative) = plt.subplots(1, 3, constrained_layout=True)
-    for prj_name, prj in results.items():
-        cases_points = {}
-        for num_bytes, descs in prj.items():
-            for desc, values in descs.items():
-                if values.get('diff'):
-                    cases_points.setdefault(desc,{}).setdefault('xrel',[]).append(num_bytes)
-                    cases_points.setdefault(desc,{}).setdefault('yrel',[]).append(values['diff'])
-                    cases_points.setdefault(desc,{}).setdefault('xbyval',[]).append(num_bytes)
-                    cases_points.setdefault(desc,{}).setdefault('ybyval',[]).append(values['by_value'])
-                    cases_points.setdefault(desc,{}).setdefault('xbyptr',[]).append(num_bytes)
-                    cases_points.setdefault(desc,{}).setdefault('ybyptr',[]).append(values['by_pointer'])
-
-        for case_name, case in cases_points.items():
-            relative.plot(case['xrel'], case['yrel'], color=next(cycol), label=f'{prj_name} {case_name}')
-            byval.plot(case['xbyval'], case['ybyval'], color=next(cycol), label=f'{prj_name} {case_name}')
-            byptr.plot(case['xbyptr'], case['ybyptr'], color=next(cycol), label=f'{prj_name} {case_name}')
-
-    relative.set_title('Relative')
-    relative.set_xscale("log", base=2)
-    relative.set_xlabel('struct size')
-    relative.set_ylabel('by_val - by_ptr')
-    relative.legend(loc="upper left")
-
-    byval.set_title('Absolute by value')
-    byval.set_xscale("log", base=2)
-    byval.set_xlabel('struct size')
-    byval.set_ylabel('cycles')
-    byval.legend(loc="upper left")
-
-    byptr.set_title('Absolute by pointer')
-    byptr.set_xscale("log", base=2)
-    byptr.set_xlabel('struct size')
-    byptr.set_ylabel('cycles')
-    byptr.legend(loc="upper left")
-
-    warnings.filterwarnings('ignore')
-    plt.show()
-    pass
-
 #-----------FOOTER-----------
-# https://github.com/AIG-Livny/mapyr.git
 try:
-    import mapyr
+    from mapyr import *
 except:
-    import requests, os
-    os.makedirs(f'{os.path.dirname(__file__)}/mapyr',exist_ok=True)
-    with open(f'{os.path.dirname(__file__)}/mapyr/__init__.py','+w') as f:
-        f.write(requests.get('https://raw.githubusercontent.com/AIG-Livny/mapyr/master/__init__.py').text)
-    import mapyr
+    import shutil, subprocess, os
+    path = f'{os.path.dirname(__file__)}/mapyr'
+    shutil.rmtree(path,ignore_errors=True)
+    if subprocess.run(['git','clone','https://github.com/AIG-Livny/mapyr.git',path]).returncode: exit()
+    from mapyr import *
 
 if __name__ == "__main__":
-    mapyr.process(config, tool_config, run)
+    process(get_rules,get_config if 'get_config' in dir() else None)
