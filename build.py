@@ -1,39 +1,41 @@
 #!/usr/bin/python3
 
-def get_config() -> "ToolConfig":
-    tc = ToolConfig()
-    tc.MINIMUM_REQUIRED_VERSION = '0.7.0'
+def get_config() -> 'core.ToolConfig':
+    tc = core.ToolConfig()
+    tc.MINIMUM_REQUIRED_VERSION = '0.8.0'
     tc.VERBOSITY = "CRITICAL"
     return tc
 
-def get_rules() -> list['Rule']:
+def get_project(name:str) -> 'core.ProjectBase':
 
-    config1 = c.Config()
-    config1.INCLUDE_DIRS = ['c-vector']
-    config1.CFLAGS = ["-O3","-flto"]
-    config1.LINK_FLAGS = ["-flto"]
+    o3config = c.Config()
+    o3config.INCLUDE_DIRS = ['c-vector']
+    o3config.CFLAGS = ["-O3","-flto"]
+    o3config.LINK_FLAGS = ["-flto"]
+    o3config.SOURCES = ['main.c']
+    o3config.OBJ_PATH = 'obj/o3'
+    o3project = c.Project('o3','bin/bench-O3-flto',o3config)
 
-    config2 = c.Config()
-    config2.INCLUDE_DIRS = ['c-vector']
-    config2.CFLAGS = ["-O1"]
+    o1config = c.Config()
+    o1config.INCLUDE_DIRS = ['c-vector']
+    o1config.CFLAGS = ["-O1"]
+    o1config.SOURCES = ['main.c']
+    o1config.OBJ_PATH = 'obj/o1'
+    o1project = c.Project('o1','bin/bench-O1',o1config)
 
-    rules = []
-    rules.append(Rule('build',['script'], phony=True))
-    rules.append(Rule('script',['script.py','bench-O3-flto','bench-O1'],exec=python.run, phony=True))
-    rules.append(Rule('script.py'))
+    c.add_default_rules(o3project)
+    c.add_default_rules(o1project)
 
-    rules.append(Rule('bench-O3-flto',['bin/bench-O3-flto'], downstream_config=config1.__dict__,phony=True))
-    rules.append(Rule('bin/bench-O3-flto',['obj/main1.o'],exec=c.link_executable))
-    rules.append(Rule('obj/main1.o',['main.c'],exec=c.build_object))
+    mainpro = core.ProjectBase('main','build',core.ConfigBase())
+    script_rule = core.Rule('script.py',mainpro,[o1project.main_rule,o3project.main_rule])
 
-    rules.append(Rule('bench-O1',['bin/bench-O1'], downstream_config=config2.__dict__,phony=True))
-    rules.append(Rule('bin/bench-O1',['obj/main2.o'],exec=c.link_executable))
-    rules.append(Rule('obj/main2.o',['main.c'],exec=c.build_object))
+    build_rule = core.Rule('build',mainpro,[script_rule],python.run,phony=True)
+    clean_rule = core.Rule('clean',mainpro,[o1project.find_rule('clean'),o3project.find_rule('clean')],phony=True)
 
-    rules.append(Rule('main.c'))
+    mainpro.rules.append(build_rule)
+    mainpro.rules.append(clean_rule)
 
-    c.add_rules_from_d_file('obj/main.d',rules)
-    return rules
+    return mainpro
 
 #-----------FOOTER-----------
 try:
@@ -46,4 +48,4 @@ except:
     from mapyr import *
 
 if __name__ == "__main__":
-    process(get_rules,get_config if 'get_config' in dir() else None)
+    core.process(get_project,get_config)

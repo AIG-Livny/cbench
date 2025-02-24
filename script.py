@@ -5,12 +5,12 @@ from itertools import cycle
 import warnings
 import mapyr
 
-def run(rule:mapyr.Rule):
+def run(rule:mapyr.core.Rule):
     print('Running... please wait')
 
     results : dict = {}
     for p in ['bin/bench-O3-flto','bin/bench-O1']:
-        data = mapyr.sh(p,output_capture=True)
+        data = mapyr.core.sh(p,output_capture=True)
         regex_data = re.findall(r'^BENCH (s\d+) (\w+) (.*(?= n)) n=(\d+) t=(.*)', data.stdout, re.MULTILINE)
 
         for struct, by_what, desc, num, time in regex_data:
@@ -60,4 +60,4 @@ def run(rule:mapyr.Rule):
 
     warnings.filterwarnings('ignore')
     plt.show()
-    pass
+    return 0
